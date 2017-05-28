@@ -23,6 +23,22 @@ public class GlobalstatsIO_LinkData
 	public string pin = null;
 }
 
+[System.Serializable]
+public class GlobalstatsIO_LeaderboardValue
+{
+	public string name = null;
+	public string user_profile = null;
+	public string user_icon = null;
+	public string rank = "0";
+	public string value = "0";
+}
+
+[System.Serializable]
+public class GlobalstatsIO_Leaderboard {
+
+	public GlobalstatsIO_LeaderboardValue[] data;
+}
+
 public class GlobalstatsIO
 {
 	[System.Serializable]
@@ -246,4 +262,62 @@ public class GlobalstatsIO
 		link_data = JsonUtility.FromJson<GlobalstatsIO_LinkData> (www.text);
 		return true;
 	}
+	
+	// numberOfPlayer can be 100 at max.
+	public GlobalstatsIO_Leaderboard getLeaderboard(string gtd, int numberOfPlayers) {
+
+
+		if (numberOfPlayers < 0) {
+			return new GlobalstatsIO_Leaderboard();
+		} else if(numberOfPlayers > 100) { // Number has to be between 0 and 100
+			numberOfPlayers = 100;
+		}
+
+		if (api_access_token == null || !api_access_token.isValid())
+		{
+			if (!getAccessToken())
+			{
+				return new GlobalstatsIO_Leaderboard();
+			}
+		}
+
+
+		string url = "https://api.globalstats.io/v1/gtdleaderboard/" + gtd;
+
+		string json_payload = "{\"limit\":" + numberOfPlayers + "\n}";
+
+		Dictionary<string, string> headers = new Dictionary<string, string>();
+		headers.Add("Authorization", "Bearer " + api_access_token.access_token);
+		headers.Add("Content-Type", "application/json");
+		headers.Add("Cache-Control", "no-cache");
+		headers.Add("Content-Length", json_payload.Length.ToString());
+
+		byte[] pData = Encoding.ASCII.GetBytes(json_payload.ToCharArray());
+
+
+		WWW www = new WWW(url, pData, headers);
+
+
+		while (!www.isDone)
+		{
+			System.Threading.Thread.Sleep(100);
+		}
+
+		// check for errors
+		if (www.error == null)
+		{
+			//UnityEngine.Debug.Log ("WWW POST Ok!");
+		}
+		else
+		{
+			UnityEngine.Debug.Log("WWW POST Error: " + www.error);
+			UnityEngine.Debug.Log("WWW POST Content: " + www.text);
+			return new GlobalstatsIO_Leaderboard();
+		}
+
+		GlobalstatsIO_Leaderboard leaderboard = JsonUtility.FromJson<GlobalstatsIO_Leaderboard>(www.text);
+
+		return leaderboard;
+	}
+	
 }

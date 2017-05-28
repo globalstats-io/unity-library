@@ -54,5 +54,17 @@ Application.OpenURL (GlobalstatsIO.link_data.url);
 ```
 Of course, this will use the data from the prior share() call for linking.
 
+### Retrieving Leaderboard 
+You can also fetch the current top positions of your leaderboard with a GTD of your choice. You can retrieve that leaderboard with following lines:
+
+```
+GlobalstatsIO gs = new GlobalstatsIO();
+string gtd = "score"
+int limit = 2;
+gs.getLeaderboard (gtd, limit);
+```
+
+In this case we want the leaderboard of the GTD score. The limit is the number players you want to fetch, which has to be between 1 and 100. 
+
 ## Feedback
 If you encounter any issues you can create a issue here on github. You can also report any issues or questions and suggestions you have to us via email to feedback@globalstats.io or via the feedback form on our website https://globalstats.io
