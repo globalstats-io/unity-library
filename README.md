@@ -3,6 +3,8 @@ The integration of the globalstats.io API into a library for unity
 
 This is still a work-in-progress. Please let us know any feedback you have or special use cases you have.
 
+If you are looking for a .Net implementation that you can also use in Unity you can take a look at https://github.com/Yucked/StatsIO
+
 ## Usage
 Simply add the .cs file to your project.
 
