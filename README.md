@@ -55,4 +55,5 @@ Application.OpenURL (GlobalstatsIO.link_data.url);
 Of course, this will use the data from the prior share() call for linking.
 
 ## Feedback
-If you encounter any issues you can create a issue here on github. You can also report any issues or questions and suggestions you have to us via email to feedback@globalstats.io or via the feedback form on our website https://globalstats.io
+If you encounter any issues you can create an issue here on github.
+Furthermore feel free to report any issues, ask questions or submit suggestions via email to feedback@globalstats.io or via the feedback form on our website https://globalstats.io
