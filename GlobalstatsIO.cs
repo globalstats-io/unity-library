@@ -144,7 +144,6 @@ public class GlobalstatsIO
 			Dictionary<string,string> headers = new Dictionary<string,string> ();
 			headers.Add ("Authorization", "Bearer " + api_access_token.access_token);
 			headers.Add ("Content-Type", "application/json");
-			headers.Add ("Content-Length", json_payload.Length.ToString ());
 
 			WWW www = new WWW (url, pData, headers);
 
