@@ -8,18 +8,13 @@ If you are looking for a .Net implementation that you can also use in Unity you 
 ## Usage
 Simply add the .cs file to your project.
 
-### Preparations
-First, before using the library in your project, you have to set a few paramters:
-```
-GlobalstatsIO.api_id = "Your_API_ID";
-GlobalstatsIO.api_secret = "Your_API_Secret";
-```
-You can set those anywhere in the code. The values are static and will be kept as long as you game is running.
-
 ### Submitting Scores
 To submit a player score instatiante a object, add the values and call Share()
 ```
-GlobalstatsIO gs = new GlobalstatsIO();
+private const string GlobalstatsIOApiId = "YourApiIdHere";
+private const string GlobalstatsIOApiSecret = "YourApiSecretHere";
+
+GlobalstatsIO gs = new GlobalstatsIO(GlobalstatsIOApiId, GlobalstatsIOApiSecret);
 
 string user_name = "Nickname";
 
