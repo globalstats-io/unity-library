@@ -195,7 +195,7 @@ namespace GlobalstatsIO
                 {
                     Debug.LogWarning("Error submitting statistic: " + www.error);
                     Debug.Log("GlobalstatsIO API Response: " + responseBody);
-                    callback(false);
+                    callback?.Invoke(false);
                 }
                 else
                 {
