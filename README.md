@@ -8,18 +8,13 @@ If you are looking for a .Net implementation that you can also use in Unity you 
 ## Usage
 Simply add the .cs file to your project.
 
-### Preparations
-First, before using the library in your project, you have to set a few paramters:
-```
-GlobalstatsIO.api_id = "Your_API_ID";
-GlobalstatsIO.api_secret = "Your_API_Secret";
-```
-You can set those anywhere in the code. The values are static and will be kept as long as you game is running.
-
 ### Submitting Scores
-To submit a player score instatiante a object, add the values and call share()
+To submit a player score instatiante a object, add the values and call Share()
 ```
-GlobalstatsIO gs = new GlobalstatsIO();
+private const string GlobalstatsIOApiId = "YourApiIdHere";
+private const string GlobalstatsIOApiSecret = "YourApiSecretHere";
+
+GlobalstatsIO gs = new GlobalstatsIO(GlobalstatsIOApiId, GlobalstatsIOApiSecret);
 
 string user_name = "Nickname";
 
@@ -28,19 +23,25 @@ values.Add ("score", Score.score.ToString());
 values.Add ("shots", Score.shots_fired.ToString());
 values.Add ("time", (Score.play_time * 1000).ToString());
 
-if (gs.share ("", user_name, values)) {
-    // Success
+// use StartCoroutine to submit the score asynchronously and use the optional callback parameter
+StartCoroutine(gs.Share ("", user_name, values, CallbackMethod)));
+
+void CallbackMethod(bool success){
+    if (success){
+        // do something with success
+    }
+    else {
+        // do something with error
+    }
 }
-else {
-    // An Error occured
-}
+
 ```
-The share call will store the users name and the ID it received back from globalstst.io.
+The Share call will store the users name and the ID it received back from globalstats.io.
 This allows you to send updated to the score by simply doing the same call again with the new values.
 
 You can check if there is a ID stored via this variable
 ```
-if (GlobalstatsIO.statistic_id != "") {
+if (gs.statistic_id != "") {
     // A statistic was already shared, new calls to share() will do an update
 }
 ```
@@ -51,8 +52,17 @@ Most of the time you want to allow the user to link his scores with his globalst
 In this case you can do this with following lines
 ```
 GlobalstatsIO gs = new GlobalstatsIO();
-gs.linkStatistic ();
-Application.OpenURL (GlobalstatsIO.link_data.url);
+StartCoroutine(gs.LinkStatistic(CallbackMethod));
+
+void CallbackMethod(bool success){
+    if (success){
+        // do something with success, like redirecting to the webpage
+        Application.OpenURL (gs.link_data.url);
+    }
+    else {
+        // do something with error
+    }
+}
 ```
 Of course, this will use the data from the prior share() call for linking.
 
@@ -63,7 +73,17 @@ You can also fetch the current top positions of your leaderboard with a GTD of y
 GlobalstatsIO gs = new GlobalstatsIO();
 string gtd = "score"
 int limit = 2;
-gs.getLeaderboard (gtd, limit);
+
+StartCoroutine(gs.GetLeaderboard(gtd, limit, CallbackMethod));
+
+void CallbackMethod(Leaderboard leaderboard){
+    if (leaderboard != null){
+        // do something with leaderboard
+    }
+    else {
+        // do something with error
+    }
+}
 ```
 
 In this case we want the leaderboard of the GTD score. The limit is the number players you want to fetch, which has to be between 1 and 100. 

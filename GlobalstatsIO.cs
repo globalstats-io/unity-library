@@ -1,322 +1,331 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.Networking;
 using System;
 using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 
-[System.Serializable]
-public class GlobalstatsIO_StatisticValues
+namespace GlobalstatsIO
 {
-	public string key = null;
-	public string value = "0";
-	public string sorting = null;
-	public string rank = "0";
-	public string value_change = "0";
-	public string rank_change = "0";
-}
+    [Serializable]
+    public class StatisticValues
+    {
+        public string key = null;
+        public string value = "0";
+        public string sorting = null;
+        public string rank = "0";
+        public string value_change = "0";
+        public string rank_change = "0";
+    }
 
-[System.Serializable]
-public class GlobalstatsIO_LinkData
-{
-	public string url = null;
-	public string pin = null;
-}
+    [Serializable]
+    public class LinkData
+    {
+        public string url = null;
+        public string pin = null;
+    }
 
-[System.Serializable]
-public class GlobalstatsIO_LeaderboardValue
-{
-	public string name = null;
-	public string user_profile = null;
-	public string user_icon = null;
-	public string rank = "0";
-	public string value = "0";
-}
+    [Serializable]
+    public class LeaderboardValue
+    {
+        public string name = null;
+        public string user_profile = null;
+        public string user_icon = null;
+        public string rank = "0";
+        public string value = "0";
+    }
 
-[System.Serializable]
-public class GlobalstatsIO_Leaderboard {
+    [Serializable]
+    public class Leaderboard
+    {
+        public LeaderboardValue[] data;
+    }
 
-	public GlobalstatsIO_LeaderboardValue[] data;
-}
+    public class GlobalstatsIOClient
+    {
+        private readonly string _apiId;
+        private readonly string _apiSecret;
+        private AccessToken _apiAccessToken;
+        private List<StatisticValues> _statisticValues = new List<StatisticValues>();
 
-public class GlobalstatsIO
-{
-	[System.Serializable]
-	private class GlobalstatsIO_AccessToken
-	{
-		public string access_token = null;
-		public string token_type = null;
-		public string expires_in = null;
-		public Int32 created_at = (Int32)(DateTime.UtcNow.Subtract (new DateTime (1970, 1, 1))).TotalSeconds;
+        [HideInInspector]
+        public string StatisticId = "";
 
-		public bool isValid()
-		{
-			//Check if still valid, allow a 2 minute grace period
-			return (created_at + int.Parse(expires_in) - 120) > (Int32)(DateTime.UtcNow.Subtract (new DateTime (1970, 1, 1))).TotalSeconds;
-		}
-	}
+        [HideInInspector]
+        public string UserName = "";
 
-	[System.Serializable]
-	private class GlobalstatsIO_StatisticResponse
-	{
-		public string name = null;
-		public string _id = null;
-		[SerializeField]
-		public List<GlobalstatsIO_StatisticValues> values = null;
-	}
+        [HideInInspector]
+        public LinkData LinkData = null;
 
-	public static string api_id = "";
-	public static string api_secret = "";
+        [Serializable]
+        private class AccessToken
+        {
+            public string access_token = null;
+            public string token_type = null;
+            public string expires_in = null;
+            public int created_at = (int) DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
-	private static GlobalstatsIO_AccessToken api_access_token = null;
+            //Check if still valid, allow a 2 minute grace period
+            public bool IsValid() =>
+                (this.created_at + int.Parse(this.expires_in) - 120) > (int) DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        }
 
-	private static List<GlobalstatsIO_StatisticValues> statistic_values = new List<GlobalstatsIO_StatisticValues> ();
-	public static string statistic_id = "";
-	public static string user_name = "";
-	public static GlobalstatsIO_LinkData link_data = null;
+        [Serializable]
+        private class StatisticResponse
+        {
+            public string name = null;
+            public string _id = null;
 
-	private bool getAccessToken ()
-	{
-		string url = "https://api.globalstats.io/oauth/access_token";
+            [SerializeField]
+            public List<StatisticValues> values = null;
+        }
 
-		WWWForm form = new WWWForm ();
-		form.AddField ("grant_type", "client_credentials");
-		form.AddField ("scope", "endpoint_client");
-		form.AddField ("client_id", api_id);
-		form.AddField ("client_secret", api_secret);
+        public GlobalstatsIOClient(string apiKey, string apiSecret)
+        {
+            this._apiId = apiKey;
+            this._apiSecret = apiSecret;
+        }
 
-		WWW www = new WWW (url, form);
+        private IEnumerator GetAccessToken()
+        {
+            string url = "https://api.globalstats.io/oauth/access_token";
 
-		while (!www.isDone) {
-			System.Threading.Thread.Sleep (100);
-		}
+            WWWForm form = new WWWForm();
+            form.AddField("grant_type", "client_credentials");
+            form.AddField("scope", "endpoint_client");
+            form.AddField("client_id", this._apiId);
+            form.AddField("client_secret", this._apiSecret);
 
-		// check for errors
-		if (www.error == null) {
-			UnityEngine.Debug.Log ("WWW getAccessToken Ok!: ");
-		} else {
-			UnityEngine.Debug.Log ("WWW getAccessToken Error: " + www.error);
-			UnityEngine.Debug.Log ("WWW Content: " + www.text);
-			return false;
-		}
+            using (UnityWebRequest www = UnityWebRequest.Post(url, form))
+            {
+                www.downloadHandler = new DownloadHandlerBuffer();
+                yield return www.SendWebRequest();
 
-		api_access_token = JsonUtility.FromJson<GlobalstatsIO_AccessToken> (www.text);
+                string responseBody = www.downloadHandler.text;
 
-		return true;
-	}
+                if (www.isNetworkError || www.isHttpError)
+                {
+                    Debug.LogWarning("Error retrieving access token: " + www.error);
+                    Debug.Log("GlobalstatsIO API Response: " + responseBody);
+                    yield break;
+                }
+                else
+                {
+                    this._apiAccessToken = JsonUtility.FromJson<AccessToken>(responseBody);
+                }
+            }
+        }
 
-	public bool share (string id = "", string name = "", Dictionary<string, string> values = null)
-	{
-		if (api_access_token == null || !api_access_token.isValid()) {
-			if (!getAccessToken ()) {
-				return false;
-			}
-		}
+        public IEnumerator Share(Dictionary<string, string> values, string id = "", string name = "", Action<bool> callback = null)
+        {
+            bool update = false;
 
-		// If no id is supplied but we have one stored, reuse it.
-		if (id == "" && statistic_id != "")
-			id = statistic_id;
+            if (this._apiAccessToken == null || !this._apiAccessToken.IsValid())
+            {
+                yield return this.GetAccessToken();
+            }
 
-		string url = "https://api.globalstats.io/v1/statistics";
-		if (id != "") {
-			url = "https://api.globalstats.io/v1/statistics/" + id;
-		} else {
-			if (name == "")
-				name = "anonymous";
-		}
+            // If no id is supplied but we have one stored, reuse it.
+            if (id == "" && this.StatisticId != "")
+            {
+                id = this.StatisticId;
+            }
 
-		string json_payload = "{\"name\":\"" + name + "\",\"values\":{";
+            string url = "https://api.globalstats.io/v1/statistics";
+            if (id != "")
+            {
+                url = "https://api.globalstats.io/v1/statistics/" + id;
+                update = true;
+            }
+            else
+            {
+                if (name == "")
+                {
+                    name = "anonymous";
+                }
+            }
 
-		bool semicolon = false;
-		foreach (KeyValuePair<string,string> value in values) {
-			if (semicolon)
-				json_payload += ",";
-			json_payload += "\"" + value.Key + "\":\"" + value.Value + "\"";
-			semicolon = true;
-		}
-		json_payload += "}}";
+            string jsonPayload;
 
-		byte[] pData = Encoding.ASCII.GetBytes (json_payload.ToCharArray ());
+            if (update == false)
+            {
+                jsonPayload = "{\"name\":\"" + name + "\", \"values\":{";
+            }
+            else
+            {
+                jsonPayload = "{\"values\":{";
+            }
 
-		GlobalstatsIO_StatisticResponse statistic = null;
+            bool semicolon = false;
+            foreach (KeyValuePair<string, string> value in values)
+            {
+                if (semicolon)
+                {
+                    jsonPayload += ",";
+                }
 
-		if (id == "") {
-			Dictionary<string,string> headers = new Dictionary<string,string> ();
-			headers.Add ("Authorization", "Bearer " + api_access_token.access_token);
-			headers.Add ("Content-Type", "application/json");
+                jsonPayload += "\"" + value.Key + "\":\"" + value.Value + "\"";
+                semicolon = true;
+            }
+            jsonPayload += "}}";
 
-			WWW www = new WWW (url, pData, headers);
+            byte[] pData = Encoding.UTF8.GetBytes(jsonPayload);
+            StatisticResponse statistic = null;
 
-			while (!www.isDone) {
-				System.Threading.Thread.Sleep (100);
-			}
+            using (UnityWebRequest www = new UnityWebRequest(url))
+            {
+                if (update == false)
+                {
+                    www.method = "POST";
+                }
+                else
+                {
+                    www.method = "PUT";
+                }
 
-			// check for errors
-			if (www.error == null) {
-				//UnityEngine.Debug.Log ("WWW POST Ok!");
-			} else {
-				UnityEngine.Debug.Log ("WWW POST Error: " + www.error);
-				UnityEngine.Debug.Log ("WWW POST Content: " + www.text);
-				return false;
-			}
+                www.uploadHandler = new UploadHandlerRaw(pData);
+                www.downloadHandler = new DownloadHandlerBuffer();
+                www.SetRequestHeader("Authorization", "Bearer " + this._apiAccessToken.access_token);
+                www.SetRequestHeader("Content-Type", "application/json");
+                yield return www.SendWebRequest();
 
-			statistic = JsonUtility.FromJson<GlobalstatsIO_StatisticResponse> (www.text);
-		} else {
-			UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Put(url, pData);
-			www.SetRequestHeader("Authorization", "Bearer " + api_access_token.access_token);
-			www.SetRequestHeader("Content-Type", "application/json");
+                string responseBody = www.downloadHandler.text;
 
-			UnityEngine.Networking.UploadHandler uploader = new UnityEngine.Networking.UploadHandlerRaw (pData);
-			www.uploadHandler = uploader;
+                if (www.isNetworkError || www.isHttpError)
+                {
+                    Debug.LogWarning("Error submitting statistic: " + www.error);
+                    Debug.Log("GlobalstatsIO API Response: " + responseBody);
+                    callback?.Invoke(false);
+                }
+                else
+                {
+                    statistic = JsonUtility.FromJson<StatisticResponse>(responseBody);
+                }
+            };
 
-			www.Send ();
+            // ID is available only on create, not on update, so do not overwrite it
+            if (statistic._id != null && statistic._id != "")
+            {
+                this.StatisticId = statistic._id;
+            }
 
-			while (!www.isDone) {
-				System.Threading.Thread.Sleep (100);
-			}
+            this.UserName = statistic.name;
 
-			// check for errors
-			if (www.error == null) {
-				//UnityEngine.Debug.Log ("WWW PUT Ok!");
-			} else {
-				UnityEngine.Debug.Log ("WWW PUT Error: " + www.error);
-				UnityEngine.Debug.Log ("WWW PUT Content: " + Encoding.ASCII.GetString(www.downloadHandler.data));
-				return false;
-			}
+            //Store the returned data statically
+            foreach (StatisticValues value in statistic.values)
+            {
+                bool updatedExisting = false;
+                for (int i = 0; i < this._statisticValues.Count; i++)
+                {
+                    if (this._statisticValues[i].key == value.key)
+                    {
+                        this._statisticValues[i] = value;
+                        updatedExisting = true;
+                        break;
+                    }
+                }
+                if (!updatedExisting)
+                {
+                    this._statisticValues.Add(value);
+                }
+            }
 
-			statistic = JsonUtility.FromJson<GlobalstatsIO_StatisticResponse> (Encoding.ASCII.GetString(www.downloadHandler.data));
-		}
+            callback?.Invoke(true);
+        }
 
-		// ID is available only on create, not on update, so do not overwrite it
-		if(statistic._id != null && statistic._id != "")
-			statistic_id = statistic._id;
+        public StatisticValues GetStatistic(string key)
+        {
+            for (int i = 0; i < this._statisticValues.Count; i++)
+            {
+                if (this._statisticValues[i].key == key)
+                {
+                    return this._statisticValues[i];
+                }
+            }
+            return null;
+        }
 
-		user_name = statistic.name;
+        public IEnumerator LinkStatistic(string id = "", Action<bool> callback = null)
+        {
+            if (this._apiAccessToken == null || !this._apiAccessToken.IsValid())
+            {
+                yield return this.GetAccessToken();
+            }
 
-		//Store the returned data statically
-		foreach (GlobalstatsIO_StatisticValues value in statistic.values) {
-			bool updated_existing = false;
-			for (int i = 0; i < statistic_values.Count; i++) {
-				if (statistic_values[i].key == value.key) {
-					statistic_values[i] = value;
-					updated_existing = true;
-					break;
-				}
-			}
-			if (!updated_existing) {
-				statistic_values.Add (value);
-			}
-		}
+            // If no id is supplied but we have one stored, reuse it.
+            if (id == "" && this.StatisticId != "")
+            {
+                id = this.StatisticId;
+            }
 
-		return true;
-	}
+            string url = "https://api.globalstats.io/v1/statisticlinks/" + id + "/request";
 
-	public GlobalstatsIO_StatisticValues getStatistic(string key)
-	{
-		for (int i = 0; i < statistic_values.Count; i++) {
-			if (statistic_values[i].key == key) {
-				return statistic_values [i];
-			}
-		}
-		return null;
-	}
+            string jsonPayload = "{}";
+            byte[] pData = Encoding.UTF8.GetBytes(jsonPayload);
 
-	public bool linkStatistic(string id = "")
-	{
-		if (api_access_token == null || !api_access_token.isValid()) {
-			if (!getAccessToken ()) {
-				return false;
-			}
-		}
+            using (UnityWebRequest www = new UnityWebRequest(url, "POST")
+            {
+                uploadHandler = new UploadHandlerRaw(pData),
+                downloadHandler = new DownloadHandlerBuffer()
+            })
+            {
+                www.SetRequestHeader("Authorization", "Bearer " + this._apiAccessToken.access_token);
+                www.SetRequestHeader("Content-Type", "application/json");
+                yield return www.SendWebRequest();
 
-		// If no id is supplied but we have one stored, reuse it.
-		if (id == "" && statistic_id != "")
-			id = statistic_id;
+                string responseBody = www.downloadHandler.text;
 
-		string url = "https://api.globalstats.io/v1/statisticlinks/"+id+"/request";
+                if (www.isNetworkError || www.isHttpError)
+                {
+                    Debug.LogWarning("Error linking statistic: " + www.error);
+                    Debug.Log("GlobalstatsIO API Response: " + responseBody);
+                    callback?.Invoke(false);
+                }
 
-		string json_payload = "{}";
-		byte[] pData = Encoding.ASCII.GetBytes (json_payload.ToCharArray ());
+                this.LinkData = JsonUtility.FromJson<LinkData>(responseBody);
+            };
 
-		Dictionary<string,string> headers = new Dictionary<string,string> ();
-		headers.Add ("Authorization", "Bearer " + api_access_token.access_token);
-		headers.Add ("Content-Type", "application/json");
-		headers.Add ("Content-Length", json_payload.Length.ToString ());
+            callback?.Invoke(true);
+        }
 
-		WWW www = new WWW (url, pData, headers);
+        public IEnumerator GetLeaderboard(string gtd, int numberOfPlayers, Action<Leaderboard> callback)
+        {
+            numberOfPlayers = Mathf.Clamp(numberOfPlayers, 0, 100); // make sure numberOfPlayers is between 0 and 100
 
-		while (!www.isDone) {
-			System.Threading.Thread.Sleep (100);
-		}
+            if (this._apiAccessToken == null || !this._apiAccessToken.IsValid())
+            {
+                yield return this.GetAccessToken();
+            }
 
-		// check for errors
-		if (www.error == null) {
-			//UnityEngine.Debug.Log ("WWW POST Ok!");
-		} else {
-			UnityEngine.Debug.Log ("WWW POST Error: " + www.error);
-			UnityEngine.Debug.Log ("WWW POST Content: " + www.text);
-			return false;
-		}
+            string url = "https://api.globalstats.io/v1/gtdleaderboard/" + gtd;
 
-		link_data = JsonUtility.FromJson<GlobalstatsIO_LinkData> (www.text);
-		return true;
-	}
-	
-	// numberOfPlayer can be 100 at max.
-	public GlobalstatsIO_Leaderboard getLeaderboard(string gtd, int numberOfPlayers) {
+            string json_payload = "{\"limit\":" + numberOfPlayers + "\n}";
+            Leaderboard leaderboard;
+            byte[] pData = Encoding.UTF8.GetBytes(json_payload);
 
+            using (UnityWebRequest www = new UnityWebRequest(url, "POST")
+            {
+                uploadHandler = new UploadHandlerRaw(pData),
+                downloadHandler = new DownloadHandlerBuffer()
+            })
+            {
+                www.SetRequestHeader("Authorization", "Bearer " + this._apiAccessToken.access_token);
+                www.SetRequestHeader("Content-Type", "application/json");
+                yield return www.SendWebRequest();
 
-		if (numberOfPlayers < 0) {
-			return new GlobalstatsIO_Leaderboard();
-		} else if(numberOfPlayers > 100) { // Number has to be between 0 and 100
-			numberOfPlayers = 100;
-		}
+                string responseBody = www.downloadHandler.text;
 
-		if (api_access_token == null || !api_access_token.isValid())
-		{
-			if (!getAccessToken())
-			{
-				return new GlobalstatsIO_Leaderboard();
-			}
-		}
+                if (www.isNetworkError || www.isHttpError)
+                {
+                    Debug.LogWarning("Error getting leaderboard: " + www.error);
+                    Debug.Log("GlobalstatsIO API Response: " + responseBody);
+                    callback?.Invoke(null);
+                }
 
+                leaderboard = JsonUtility.FromJson<Leaderboard>(responseBody);
+            };
 
-		string url = "https://api.globalstats.io/v1/gtdleaderboard/" + gtd;
-
-		string json_payload = "{\"limit\":" + numberOfPlayers + "\n}";
-
-		Dictionary<string, string> headers = new Dictionary<string, string>();
-		headers.Add("Authorization", "Bearer " + api_access_token.access_token);
-		headers.Add("Content-Type", "application/json");
-		headers.Add("Cache-Control", "no-cache");
-		headers.Add("Content-Length", json_payload.Length.ToString());
-
-		byte[] pData = Encoding.ASCII.GetBytes(json_payload.ToCharArray());
-
-
-		WWW www = new WWW(url, pData, headers);
-
-
-		while (!www.isDone)
-		{
-			System.Threading.Thread.Sleep(100);
-		}
-
-		// check for errors
-		if (www.error == null)
-		{
-			//UnityEngine.Debug.Log ("WWW POST Ok!");
-		}
-		else
-		{
-			UnityEngine.Debug.Log("WWW POST Error: " + www.error);
-			UnityEngine.Debug.Log("WWW POST Content: " + www.text);
-			return new GlobalstatsIO_Leaderboard();
-		}
-
-		GlobalstatsIO_Leaderboard leaderboard = JsonUtility.FromJson<GlobalstatsIO_Leaderboard>(www.text);
-
-		return leaderboard;
-	}
-	
+            callback?.Invoke(leaderboard);
+        }
+    }
 }
