@@ -1,0 +1,12 @@
+{
+  "name": "io.globalstats.unity",
+  "version": "1.0.0",
+  "displayName": "GlobalStats",
+  "description": "The integration of the globalstats.io API into a library for unity",
+  "unity": "2018.4",
+  "author": {
+    "name": "globalstats.io",
+    "email": "feedback@globalstats.io",
+    "url": "https://globalstats.io/"
+  }
+}
